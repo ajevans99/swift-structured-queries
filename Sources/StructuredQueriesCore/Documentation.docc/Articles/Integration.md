@@ -48,3 +48,14 @@ StructuredQueries and GRDB.
 
 [SQLiteData: http://github.com/pointfreeco/sqlite-data
 [sq-sqlite-data]: https://github.com/pointfreeco/sqlite-data/tree/main/Sources/StructuredQueriesGRDBCore
+
+### Case Study: PostgresNIO
+
+This package also contains a first-party integration module for PostgresNIO,
+`StructuredQueriesPostgresNIO`. It extends `PostgresClient` with overloads that can execute
+StructuredQueries `Statement` and `SelectStatement` values, and decode rows via a
+``QueryDecoder`` conformance.
+
+See the module sources [here][sq-postgres] for a complete integration:
+
+[sq-postgres]: https://github.com/pointfreeco/swift-structured-queries/tree/main/Sources/StructuredQueriesPostgresNIO

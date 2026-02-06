@@ -202,6 +202,11 @@ _etc._), but is currently tuned to work with SQLite. It currently has one offici
     SwiftData and the `@Query` macro. SQLiteData includes `StructuredQueriesGRDB`, a library that
     integrates this one with the popular [GRDB](https://github.com/groue/GRDB.swift) SQLite library.
 
+And one first-party Postgres integration module:
+
+  * `StructuredQueriesPostgresNIO`: A module in this repository that integrates StructuredQueries
+    with [PostgresNIO](https://github.com/vapor/postgres-nio).
+
 If you are interested in building a StructuredQueries integration for another database library,
 please see [Integrating with database libraries][sq-docs-integration], and
 [start a discussion](http://github.com/pointfreeco/swift-structured-queries/discussions/new/choose)

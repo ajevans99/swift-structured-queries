@@ -29,6 +29,10 @@ let package = Package(
       targets: ["StructuredQueriesSQLiteCore"]
     ),
     .library(
+      name: "StructuredQueriesPostgresNIO",
+      targets: ["StructuredQueriesPostgresNIO"]
+    ),
+    .library(
       name: "StructuredQueriesTestSupport",
       targets: ["StructuredQueriesTestSupport"]
     ),
@@ -39,6 +43,7 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.3"),
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.18.4"),
     .package(url: "https://github.com/pointfreeco/xctest-dynamic-overlay", from: "1.5.2"),
+    .package(url: "https://github.com/vapor/postgres-nio", from: "1.0.0"),
     .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"603.0.0"),
   ],
   targets: [
@@ -87,6 +92,13 @@ let package = Package(
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
       ]
     ),
+    .target(
+      name: "StructuredQueriesPostgresNIO",
+      dependencies: [
+        "StructuredQueries",
+        .product(name: "PostgresNIO", package: "postgres-nio"),
+      ]
+    ),
 
     .target(
       name: "StructuredQueriesTestSupport",
@@ -110,9 +122,21 @@ let package = Package(
       name: "StructuredQueriesTests",
       dependencies: [
         "StructuredQueries",
+        "StructuredQueriesSQLite",
+        "StructuredQueriesPostgresNIO",
         "StructuredQueriesTestSupport",
         "_StructuredQueriesSQLite",
         .product(name: "CustomDump", package: "swift-custom-dump"),
+        .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "InlineSnapshotTesting", package: "swift-snapshot-testing"),
+      ]
+    ),
+    .testTarget(
+      name: "StructuredQueriesPostgresNIOTests",
+      dependencies: [
+        "StructuredQueries",
+        "StructuredQueriesPostgresNIO",
+        "StructuredQueriesTestSupport",
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "InlineSnapshotTesting", package: "swift-snapshot-testing"),
       ]

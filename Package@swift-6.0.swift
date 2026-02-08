@@ -116,6 +116,7 @@ let package = Package(
         "StructuredQueriesSQLiteMacros",
         .product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
         .product(name: "MacroTesting", package: "swift-macro-testing"),
+        .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
       ]
     ),
     .testTarget(
@@ -123,7 +124,6 @@ let package = Package(
       dependencies: [
         "StructuredQueries",
         "StructuredQueriesSQLite",
-        "StructuredQueriesPostgresNIO",
         "StructuredQueriesTestSupport",
         "_StructuredQueriesSQLite",
         .product(name: "CustomDump", package: "swift-custom-dump"),
@@ -137,8 +137,6 @@ let package = Package(
         "StructuredQueries",
         "StructuredQueriesPostgresNIO",
         "StructuredQueriesTestSupport",
-        .product(name: "Dependencies", package: "swift-dependencies"),
-        .product(name: "InlineSnapshotTesting", package: "swift-snapshot-testing"),
       ]
     ),
 

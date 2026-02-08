@@ -70,15 +70,11 @@ package struct PostgresQueryDecoder: QueryDecoder {
     try decodeValue(UUID.self)
   }
 
-  private mutating func decodeValue<T: PostgresDecodable>(_ columnType: T.Type) throws -> T?
+private mutating func decodeValue<T: PostgresDecodable>(_ columnType: T.Type) throws -> T?
   where T._DecodableType == T {
     guard let cell = row?.next() else {
       return nil
     }
     return try cell.decode(T?.self)
   }
-}
-
-package struct UInt64OverflowError: Error {
-  let signedInteger: Int64
 }

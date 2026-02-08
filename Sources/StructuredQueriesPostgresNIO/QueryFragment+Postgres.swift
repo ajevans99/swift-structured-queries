@@ -43,7 +43,3 @@ extension PostgresBindings {
     }
   }
 }
-
-package struct Int64OverflowError: Error {
-  let unsignedInteger: UInt64
-}

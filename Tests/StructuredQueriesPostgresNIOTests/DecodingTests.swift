@@ -47,6 +47,11 @@ import Testing
     #expect(try decoder.decode(Date.self) == nil)
   }
 
+  @Test func queryRepresentableBoolDecodesFromPostgresBool() throws {
+    var decoder = PostgresQueryDecoder(cells: [cell(.init(bool: true), index: 0)])
+    #expect(try Bool(decoder: &decoder))
+  }
+
   @Test func unsignedOverflowThrows() throws {
     var decoder = PostgresQueryDecoder(
       cells: [cell(.init(int64: -1), index: 0)]

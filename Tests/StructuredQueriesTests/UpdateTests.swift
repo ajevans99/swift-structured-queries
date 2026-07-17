@@ -40,7 +40,7 @@ extension SnapshotTests {
       }
       assertQuery(
         Reminder
-          .where { $0.priority == nil }
+          .where { $0.priority.is(nil) }
           .update { $0.isCompleted = true }
           .returning { ($0.title, $0.priority, $0.isCompleted) }
       ) {
@@ -307,7 +307,7 @@ extension SnapshotTests {
         .find(1)
         .update {
           $0.dueDate = Case()
-            .when($0.dueDate == nil, then: #sql("'2018-01-29 00:08:00.000'"))
+            .when($0.dueDate.is(nil), then: #sql("'2018-01-29 00:08:00.000'"))
         }
 
       assertQuery(
@@ -386,7 +386,7 @@ extension SnapshotTests {
       ) {
         """
         UPDATE "roots"
-        SET "honestCount" = 1, "optionalCount" = 1
+        SET "honestCount" = 1, "optionalCount" = 1, "string" = NULL
         """
       }
     }
@@ -414,10 +414,26 @@ extension SnapshotTests {
 }
 
 @Table private struct Root {
-  @Columns var fields: NestedFields
+  @Column var fields: NestedFields
 }
 
 @Selection struct NestedFields {
   var honestCount: Int = 0
   var optionalCount: Int?
+  @Column(as: String.TestRepresentation?.self)
+  var string: String?
+}
+
+extension String {
+  struct TestRepresentation: QueryRepresentable, QueryBindable, QueryDecodable {
+    var queryOutput: String
+    var queryBinding: QueryBinding { .text(queryOutput) }
+
+    init(queryOutput: String) {
+      self.queryOutput = queryOutput
+    }
+    init(decoder: inout some QueryDecoder) throws {
+      self.queryOutput = try String(decoder: &decoder)
+    }
+  }
 }

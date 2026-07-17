@@ -6,7 +6,7 @@ import StructuredQueriesTestSupport
 import Testing
 import _StructuredQueriesSQLite
 
-#if StructuredQueriesCasePaths
+#if CasePaths
   import CasePaths
 #endif
 
@@ -160,7 +160,6 @@ extension SnapshotTests {
         SET "isOutOfStock" = 1, "isOnBackOrder" = 1
         """
       }
-      // FIXME: These should decode 'nil' but because all its fields have defaults it coalesces.
       assertQuery(
         DefaultItem?(nil)
       ) {
@@ -169,16 +168,9 @@ extension SnapshotTests {
         """
       } results: {
         """
-        ┌──────────────────────────┐
-        │ DefaultItem(             │
-        │   title: "",             │
-        │   quantity: 0,           │
-        │   status: Status(        │
-        │     isOutOfStock: false, │
-        │     isOnBackOrder: false │
-        │   )                      │
-        │ )                        │
-        └──────────────────────────┘
+        ┌─────┐
+        │ nil │
+        └─────┘
         """
       }
       // NB: This tests that 'Optional.none' is favored over 'Table.none'.
@@ -190,16 +182,9 @@ extension SnapshotTests {
         """
       } results: {
         """
-        ┌──────────────────────────┐
-        │ DefaultItem(             │
-        │   title: "",             │
-        │   quantity: 0,           │
-        │   status: Status(        │
-        │     isOutOfStock: false, │
-        │     isOnBackOrder: false │
-        │   )                      │
-        │ )                        │
-        └──────────────────────────┘
+        ┌─────┐
+        │ nil │
+        └─────┘
         """
       }
       assertQuery(
@@ -527,7 +512,7 @@ extension SnapshotTests {
       }
     }
 
-    #if StructuredQueriesCasePaths
+    #if CasePaths
       @Test func `enum`() throws {
         try db.execute(
           #sql(
@@ -713,14 +698,14 @@ private struct Note {
   let body: String
 }
 
-#if StructuredQueriesCasePaths
-  @CasePathable @Table
+#if CasePaths
+  @Table
   private enum Post {
     case photo(Photo)
     case note(String = "")
   }
 
-  @CasePathable @Table
+  @Table
   private enum Notes {
     @Column(as: [String].JSONRepresentation.self)
     case list([String])

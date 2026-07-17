@@ -79,6 +79,8 @@ extension Optional: QueryRepresentable where Wrapped: QueryRepresentable {
 }
 
 extension Optional: Table, PartialSelectStatement, Statement where Wrapped: Table {
+  public typealias Draft = Wrapped.Draft?
+
   public static var tableName: String {
     Wrapped.tableName
   }
@@ -185,13 +187,11 @@ extension Optional: Table, PartialSelectStatement, Statement where Wrapped: Tabl
 
 extension Optional: _Selection where Wrapped: _Selection {}
 
-extension Optional: PrimaryKeyedTable where Wrapped: PrimaryKeyedTable {
-  public typealias Draft = Wrapped.Draft?
-}
+extension Optional: PrimaryKeyedTable where Wrapped: PrimaryKeyedTable {}
 
 extension Optional: TableDraft where Wrapped: TableDraft {
-  public typealias PrimaryTable = Wrapped.PrimaryTable?
-  public init(_ primaryTable: Wrapped.PrimaryTable?) {
+  public typealias SourceTable = Wrapped.SourceTable?
+  public init(_ primaryTable: Wrapped.SourceTable?) {
     self = primaryTable.map(Wrapped.init)
   }
 }
@@ -207,6 +207,10 @@ where Wrapped.TableColumns: PrimaryKeyedTableDefinition {
 
     public var _names: [String] {
       Wrapped.columns.primaryKey._names
+    }
+
+    public var defaultValue: Wrapped.PrimaryKey.QueryOutput?? {
+      Wrapped.columns.primaryKey.defaultValue
     }
 
     public var keyPath: KeyPath<Wrapped?, Wrapped.PrimaryKey.QueryOutput?> {
@@ -227,10 +231,6 @@ extension Optional.TableColumns.PrimaryColumn: TableColumnExpression
 where Wrapped.TableColumns.PrimaryColumn: TableColumnExpression {
   public var name: String {
     Wrapped.columns.primaryKey.name
-  }
-
-  public var defaultValue: Wrapped.PrimaryKey.QueryOutput?? {
-    Wrapped.columns.primaryKey.defaultValue
   }
 
   public func _aliased<Name: AliasName>(
@@ -276,11 +276,12 @@ extension QueryExpression where QueryValue: _OptionalProtocol {
   /// - Parameter transform: A closure that takes an unwrapped version of this expression.
   /// - Returns: The result of the transform function, optionalized.
   public func map<T>(
-    _ transform: (SQLQueryExpression<QueryValue.Wrapped>) -> some QueryExpression<T>
-  ) -> some QueryExpression<T?> {
-    Case(SQLQueryExpression("\(self) IS NULL"))
+    _ transform: (_UnwrapExpression<Self>) -> some QueryExpression<T>
+  ) -> some QueryExpression<T?>
+  where QueryValue: QueryRepresentable & QueryExpression {
+    Case(self.is(nil))
       .when(SQLQueryExpression("1"), then: SQLQueryExpression("NULL"))
-      .else(SQLQueryExpression(transform(SQLQueryExpression(queryFragment)).queryFragment))
+      .else(SQLQueryExpression(transform(_UnwrapExpression(base: self)).queryFragment))
   }
 
   /// Creates a new optional expression from this one by applying an unwrapped version of this
@@ -297,8 +298,17 @@ extension QueryExpression where QueryValue: _OptionalProtocol {
   /// - Parameter transform: A closure that takes an unwrapped version of this expression.
   /// - Returns: The result of the transform function.
   public func flatMap<T>(
-    _ transform: (SQLQueryExpression<QueryValue.Wrapped>) -> some QueryExpression<T?>
+    _ transform: (_UnwrapExpression<Self>) -> some QueryExpression<T?>
   ) -> some QueryExpression<T?> {
-    SQLQueryExpression(transform(SQLQueryExpression(queryFragment)).queryFragment)
+    SQLQueryExpression(transform(_UnwrapExpression(base: self)).queryFragment)
   }
+}
+
+public struct _UnwrapExpression<Base: QueryExpression>: QueryExpression
+where Base.QueryValue: _OptionalProtocol {
+  public typealias QueryValue = Base.QueryValue.Wrapped
+
+  let base: Base
+
+  public var queryFragment: QueryFragment { base.queryFragment }
 }

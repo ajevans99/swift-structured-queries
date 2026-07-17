@@ -1,168 +1,245 @@
-import Foundation
-import PostgresNIO
-import StructuredQueries
+internal import Logging
+public import PostgresNIO
+public import StructuredQueriesCore
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 extension PostgresClient {
   public func query<S: SelectStatement>(
-    _ query: S
-  ) throws -> DecodedStatementSequence<S.From>
-  where S.QueryValue == (), S.Joins == (), S.From.QueryOutput: Sendable {
+    _ query: S,
+    logger: Logger? = nil,
+    file: String = #fileID,
+    line: Int = #line
+  ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, S.From.QueryOutput>
+  where S.QueryValue == (), S.Joins == (), S.From: Sendable, S.From.QueryOutput: Sendable {
     let queryFragment = query.selectStar().asSelect().query
-    guard !queryFragment.isEmpty else {
-      return DecodedStatementSequence<S.From>(client: self, query: nil)
-    }
-    return try DecodedStatementSequence<S.From>(
-      client: self,
-      query: PostgresQuery(queryFragment: queryFragment)
+    return try await decode(
+      rows(for: queryFragment, logger: logger, file: file, line: line),
+      as: S.From.self
     )
   }
 
   public func query<S: Statement>(
-    _ query: S
-  ) throws -> DecodedStatementSequence<S.QueryValue>
-  where S.QueryValue: QueryRepresentable, S.QueryValue.QueryOutput: Sendable {
-    let queryFragment = query.query
-    guard !queryFragment.isEmpty else {
-      return DecodedStatementSequence<S.QueryValue>(client: self, query: nil)
+    _ query: S,
+    logger: Logger? = nil,
+    file: String = #fileID,
+    line: Int = #line
+  ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, S.QueryValue.QueryOutput>
+  where
+    S.QueryValue: QueryRepresentable & Sendable,
+    S.QueryValue.QueryOutput: Sendable
+  {
+    return try await decode(
+      rows(for: query.query, logger: logger, file: file, line: line),
+      as: S.QueryValue.self
+    )
+  }
+
+  public func execute<S: Statement>(
+    _ statement: S,
+    logger: Logger? = nil,
+    file: String = #fileID,
+    line: Int = #line
+  ) async throws -> PostgresQueryMetadata?
+  where S.QueryValue == () {
+    guard !statement.query.isEmpty else { return nil }
+    let logger = logger ?? postgresLoggingDisabled
+    return try await withConnection { connection in
+      try await connection.execute(statement, logger: logger, file: file, line: line)
     }
-    return try DecodedStatementSequence<S.QueryValue>(
-      client: self,
-      query: PostgresQuery(queryFragment: queryFragment)
+  }
+
+  private func rows(
+    for queryFragment: QueryFragment,
+    logger: Logger?,
+    file: String,
+    line: Int
+  ) async throws -> PostgresRowSequence {
+    return try await query(
+      PostgresQuery(queryFragment: queryFragment),
+      logger: logger,
+      file: file,
+      line: line
     )
   }
 }
 
 @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
 extension PostgresClient {
-  public func query<S: SelectStatement, each J: Table>(
-    _ query: S
-  ) throws -> DecodedTupleStatementSequence<S.From, repeat each J>
+  public func query<S: SelectStatement, each J: Table & Sendable>(
+    _ query: S,
+    logger: Logger? = nil,
+    file: String = #fileID,
+    line: Int = #line
+  ) async throws -> AsyncThrowingMapSequence<
+    PostgresRowSequence, (S.From.QueryOutput, repeat (each J).QueryOutput)
+  >
   where
     S.QueryValue == (),
     S.Joins == (repeat each J),
     repeat (each J).QueryOutput: Sendable,
+    S.From: Sendable,
     S.From.QueryOutput: Sendable
   {
     let queryFragment = query.selectStar().asSelect().query
-    guard !queryFragment.isEmpty else {
-      return DecodedTupleStatementSequence<S.From, repeat each J>(client: self, query: nil)
-    }
-    return try DecodedTupleStatementSequence<S.From, repeat each J>(
-      client: self,
-      query: PostgresQuery(queryFragment: queryFragment)
+    return try await decode(
+      rows(for: queryFragment, logger: logger, file: file, line: line),
+      as: (S.From, repeat each J).self
     )
   }
 
-  public func query<each V: QueryRepresentable>(
-    _ query: some Statement<(repeat each V)>
-  ) throws -> DecodedTupleStatementSequence<repeat each V>
+  public func query<each V: QueryRepresentable & Sendable>(
+    _ query: some Statement<(repeat each V)>,
+    logger: Logger? = nil,
+    file: String = #fileID,
+    line: Int = #line
+  ) async throws -> AsyncThrowingMapSequence<
+    PostgresRowSequence, (repeat (each V).QueryOutput)
+  >
   where repeat (each V).QueryOutput: Sendable {
-    let queryFragment = query.query
-    guard !queryFragment.isEmpty else {
-      return DecodedTupleStatementSequence<repeat each V>(client: self, query: nil)
-    }
-    return try DecodedTupleStatementSequence<repeat each V>(
-      client: self,
-      query: PostgresQuery(queryFragment: queryFragment)
+    return try await decode(
+      rows(for: query.query, logger: logger, file: file, line: line),
+      as: (repeat each V).self
     )
   }
 }
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-public struct DecodedStatementSequence<QueryValue: QueryRepresentable>: AsyncSequence
-where QueryValue.QueryOutput: Sendable {
-  public typealias Element = QueryValue.QueryOutput
-
-  let client: PostgresClient
-  let query: PostgresQuery?
-
-  init(client: PostgresClient, query: PostgresQuery?) {
-    self.client = client
-    self.query = query
-  }
-
-  public func makeAsyncIterator() -> Iterator {
-    Iterator(
-      client: client,
-      query: query,
-      rows: nil,
-      isFinished: false
+extension PostgresConnection {
+  public func query<S: SelectStatement>(
+    _ query: S,
+    logger: Logger,
+    file: String = #fileID,
+    line: Int = #line
+  ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, S.From.QueryOutput>
+  where S.QueryValue == (), S.Joins == (), S.From: Sendable, S.From.QueryOutput: Sendable {
+    let queryFragment = query.selectStar().asSelect().query
+    return try await decode(
+      rows(for: queryFragment, logger: logger, file: file, line: line),
+      as: S.From.self
     )
   }
 
-  public struct Iterator: AsyncIteratorProtocol {
-    let client: PostgresClient
-    let query: PostgresQuery?
-    var rows: PostgresRowSequence.AsyncIterator?
-    var isFinished: Bool
+  public func query<S: Statement>(
+    _ query: S,
+    logger: Logger,
+    file: String = #fileID,
+    line: Int = #line
+  ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, S.QueryValue.QueryOutput>
+  where
+    S.QueryValue: QueryRepresentable & Sendable,
+    S.QueryValue.QueryOutput: Sendable
+  {
+    return try await decode(
+      rows(for: query.query, logger: logger, file: file, line: line),
+      as: S.QueryValue.self
+    )
+  }
 
-    public mutating func next() async throws -> Element? {
-      guard !isFinished else { return nil }
-      guard let query else {
-        isFinished = true
-        return nil
+  public func execute<S: Statement>(
+    _ statement: S,
+    logger: Logger,
+    file: String = #fileID,
+    line: Int = #line
+  ) async throws -> PostgresQueryMetadata?
+  where S.QueryValue == () {
+    guard !statement.query.isEmpty else { return nil }
+    let query = try PostgresQuery(queryFragment: statement.query)
+    return try await withTaskCancellationHandler {
+      try Task.checkCancellation()
+      do {
+        let metadata =
+          try await self.query(query, logger: logger, file: file, line: line) { _ in }.get()
+        try Task.checkCancellation()
+        return metadata
+      } catch {
+        try Task.checkCancellation()
+        throw error
       }
-      if rows == nil {
-        rows = try await client.query(query).makeAsyncIterator()
-      }
-      guard var rows else { return nil }
-      defer { self.rows = rows }
-      guard let row = try await rows.next() else {
-        isFinished = true
-        return nil
-      }
-      var decoder = PostgresQueryDecoder(cells: Array(row))
-      return try QueryValue(decoder: &decoder).queryOutput
+    } onCancel: {
+      self.close().whenComplete { _ in }
     }
+  }
+
+  private func rows(
+    for queryFragment: QueryFragment,
+    logger: Logger,
+    file: String,
+    line: Int
+  ) async throws -> PostgresRowSequence {
+    return try await query(
+      PostgresQuery(queryFragment: queryFragment),
+      logger: logger,
+      file: file,
+      line: line
+    )
   }
 }
 
 @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
-public struct DecodedTupleStatementSequence<each V: QueryRepresentable>: AsyncSequence
-where repeat (each V).QueryOutput: Sendable {
-  public typealias Element = (repeat (each V).QueryOutput)
-
-  let client: PostgresClient
-  let query: PostgresQuery?
-
-  init(client: PostgresClient, query: PostgresQuery?) {
-    self.client = client
-    self.query = query
-  }
-
-  public func makeAsyncIterator() -> Iterator {
-    Iterator(
-      client: client,
-      query: query,
-      rows: nil,
-      isFinished: false
+extension PostgresConnection {
+  public func query<S: SelectStatement, each J: Table & Sendable>(
+    _ query: S,
+    logger: Logger,
+    file: String = #fileID,
+    line: Int = #line
+  ) async throws -> AsyncThrowingMapSequence<
+    PostgresRowSequence, (S.From.QueryOutput, repeat (each J).QueryOutput)
+  >
+  where
+    S.QueryValue == (),
+    S.Joins == (repeat each J),
+    repeat (each J).QueryOutput: Sendable,
+    S.From: Sendable,
+    S.From.QueryOutput: Sendable
+  {
+    let queryFragment = query.selectStar().asSelect().query
+    return try await decode(
+      rows(for: queryFragment, logger: logger, file: file, line: line),
+      as: (S.From, repeat each J).self
     )
   }
 
-  public struct Iterator: AsyncIteratorProtocol {
-    let client: PostgresClient
-    let query: PostgresQuery?
-    var rows: PostgresRowSequence.AsyncIterator?
-    var isFinished: Bool
-
-    public mutating func next() async throws -> Element? {
-      guard !isFinished else { return nil }
-      guard let query else {
-        isFinished = true
-        return nil
-      }
-      if rows == nil {
-        rows = try await client.query(query).makeAsyncIterator()
-      }
-      guard var rows else { return nil }
-      defer { self.rows = rows }
-      guard let row = try await rows.next() else {
-        isFinished = true
-        return nil
-      }
-      var decoder = PostgresQueryDecoder(cells: Array(row))
-      return try (repeat (each V)(decoder: &decoder).queryOutput)
-    }
+  public func query<each V: QueryRepresentable & Sendable>(
+    _ query: some Statement<(repeat each V)>,
+    logger: Logger,
+    file: String = #fileID,
+    line: Int = #line
+  ) async throws -> AsyncThrowingMapSequence<
+    PostgresRowSequence, (repeat (each V).QueryOutput)
+  >
+  where repeat (each V).QueryOutput: Sendable {
+    return try await decode(
+      rows(for: query.query, logger: logger, file: file, line: line),
+      as: (repeat each V).self
+    )
   }
 }
+
+private func decode<QueryValue: QueryRepresentable & Sendable>(
+  _ rows: PostgresRowSequence,
+  as queryValue: QueryValue.Type
+) -> AsyncThrowingMapSequence<PostgresRowSequence, QueryValue.QueryOutput>
+where QueryValue.QueryOutput: Sendable {
+  rows.map { row in
+    var decoder = PostgresQueryDecoder(cells: Array(row))
+    return try QueryValue(decoder: &decoder).queryOutput
+  }
+}
+
+private func decode<each QueryValue: QueryRepresentable & Sendable>(
+  _ rows: PostgresRowSequence,
+  as queryValue: (repeat each QueryValue).Type
+) -> AsyncThrowingMapSequence<
+  PostgresRowSequence, (repeat (each QueryValue).QueryOutput)
+>
+where repeat (each QueryValue).QueryOutput: Sendable {
+  rows.map { row in
+    var decoder = PostgresQueryDecoder(cells: Array(row))
+    return try (repeat (each QueryValue)(decoder: &decoder).queryOutput)
+  }
+}
+
+private let postgresLoggingDisabled = Logger(
+  label: "StructuredQueriesPostgresNIO-do-not-log",
+  factory: { _ in SwiftLogNoOpLogHandler() }
+)

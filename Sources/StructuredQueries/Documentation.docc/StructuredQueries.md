@@ -22,8 +22,9 @@ StructuredQueries also ships SQLite-specific helpers:
 
 StructuredQueries also ships a Postgres integration module:
 
-  - `StructuredQueriesPostgresNIO`: Extensions on `PostgresClient` for executing and decoding
-    StructuredQueries statements with PostgresNIO.
+  - `StructuredQueriesPostgresNIO`: Extensions on `PostgresClient` and `PostgresConnection` for
+    executing and decoding StructuredQueries statements with PostgresNIO, including streaming reads,
+    transaction-scoped queries, and metadata-preserving writes.
 
 ## Topics
 

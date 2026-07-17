@@ -1,6 +1,6 @@
-import Foundation
-import PostgresNIO
-import StructuredQueries
+internal import Foundation
+package import PostgresNIO
+package import StructuredQueriesCore
 
 extension PostgresQuery {
   package init(queryFragment: QueryFragment) throws {

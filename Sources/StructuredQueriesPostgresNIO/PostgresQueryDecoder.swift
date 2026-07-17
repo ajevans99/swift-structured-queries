@@ -1,31 +1,12 @@
-import Foundation
-import PostgresNIO
-import StructuredQueries
+package import Foundation
+package import PostgresNIO
+package import StructuredQueriesCore
 
 package struct PostgresQueryDecoder: QueryDecoder {
-  var rows: PostgresRowSequence.AsyncIterator?
-  var row: AnyIterator<PostgresCell>?
-
-  init(rows: PostgresRowSequence.AsyncIterator) {
-    self.rows = rows
-  }
+  private var row: IndexingIterator<[PostgresCell]>
 
   package init(cells: [PostgresCell]) {
-    self.rows = nil
-    self.row = AnyIterator(cells.makeIterator())
-  }
-
-  package mutating func next() async throws -> Bool {
-    guard var rows else {
-      return false
-    }
-    defer { self.rows = rows }
-    guard let row = try await rows.next() else {
-      self.row = nil
-      return false
-    }
-    self.row = AnyIterator(row.makeIterator())
-    return true
+    self.row = cells.makeIterator()
   }
 
   package mutating func decode(_ columnType: [UInt8].Type) throws -> [UInt8]? {
@@ -49,7 +30,13 @@ package struct PostgresQueryDecoder: QueryDecoder {
   }
 
   package mutating func decode(_ columnType: Int64.Type) throws -> Int64? {
-    try decodeValue(Int64.self)
+    guard let cell = row.next() else {
+      return nil
+    }
+    if cell.dataType == .bool {
+      return try cell.decode(Bool?.self).map { $0 ? 1 : 0 }
+    }
+    return try cell.decode(Int64?.self)
   }
 
   package mutating func decode(_ columnType: String.Type) throws -> String? {
@@ -70,9 +57,9 @@ package struct PostgresQueryDecoder: QueryDecoder {
     try decodeValue(UUID.self)
   }
 
-private mutating func decodeValue<T: PostgresDecodable>(_ columnType: T.Type) throws -> T?
+  private mutating func decodeValue<T: PostgresDecodable>(_ columnType: T.Type) throws -> T?
   where T._DecodableType == T {
-    guard let cell = row?.next() else {
+    guard let cell = row.next() else {
       return nil
     }
     return try cell.decode(T?.self)

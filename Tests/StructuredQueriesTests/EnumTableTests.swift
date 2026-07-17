@@ -1,4 +1,4 @@
-#if StructuredQueriesCasePaths
+#if CasePaths
   import CasePaths
   import Dependencies
   import Foundation
@@ -130,6 +130,70 @@
         }
       }
 
+      @Test func isOperator() {
+        assertQuery(
+          Attachment.where { $0.kind.is(\.note) }
+        ) {
+          """
+          SELECT "attachments"."id", "attachments"."link", "attachments"."note", "attachments"."videoURL", "attachments"."videoKind", "attachments"."imageCaption", "attachments"."imageURL"
+          FROM "attachments"
+          WHERE (("attachments"."note") IS NOT (NULL))
+          """
+        } results: {
+          """
+          ┌───────────────────────────────────────┐
+          │ Attachment(                           │
+          │   id: 2,                              │
+          │   kind: .note("Today was a good day") │
+          │ )                                     │
+          └───────────────────────────────────────┘
+          """
+        }
+        assertQuery(
+          Attachment.where { $0.kind.is(\.video) }
+        ) {
+          """
+          SELECT "attachments"."id", "attachments"."link", "attachments"."note", "attachments"."videoURL", "attachments"."videoKind", "attachments"."imageCaption", "attachments"."imageURL"
+          FROM "attachments"
+          WHERE (("attachments"."videoURL", "attachments"."videoKind") IS NOT (NULL, NULL))
+          """
+        } results: {
+          """
+          ┌─────────────────────────────────────────────────────┐
+          │ Attachment(                                         │
+          │   id: 3,                                            │
+          │   kind: .video(                                     │
+          │     Attachment.Video(                               │
+          │       url: URL(https://www.youtube.com/video/1234), │
+          │       kind: .youtube                                │
+          │     )                                               │
+          │   )                                                 │
+          │ )                                                   │
+          └─────────────────────────────────────────────────────┘
+          """
+        }
+        assertQuery(
+          Attachment
+            .select { $0.kind.video }
+            .where { $0.kind.video.isNot(nil) }
+        ) {
+          """
+          SELECT "attachments"."videoURL", "attachments"."videoKind"
+          FROM "attachments"
+          WHERE (("attachments"."videoURL", "attachments"."videoKind") IS NOT (NULL, NULL))
+          """
+        } results: {
+          """
+          ┌─────────────────────────────────────────────────┐
+          │ Attachment.Video(                               │
+          │   url: URL(https://www.youtube.com/video/1234), │
+          │   kind: .youtube                                │
+          │ )                                               │
+          └─────────────────────────────────────────────────┘
+          """
+        }
+      }
+
       @Test func dynamicMemberLookup_CasePath() {
         assertQuery(
           Attachment.select(\.kind.image)
@@ -183,7 +247,7 @@
           """
           SELECT "attachments"."id", "attachments"."link", "attachments"."note", "attachments"."videoURL", "attachments"."videoKind", "attachments"."imageCaption", "attachments"."imageURL"
           FROM "attachments"
-          WHERE ("attachments"."link", "attachments"."note", "attachments"."videoURL", "attachments"."videoKind", "attachments"."imageCaption", "attachments"."imageURL") IS (NULL, 'Today was a good day', NULL, NULL, NULL, NULL)
+          WHERE (("attachments"."link", "attachments"."note", "attachments"."videoURL", "attachments"."videoKind", "attachments"."imageCaption", "attachments"."imageURL") IS (NULL, 'Today was a good day', NULL, NULL, NULL, NULL))
           """
         } results: {
           """
@@ -201,7 +265,7 @@
           """
           SELECT "attachments"."id", "attachments"."link", "attachments"."note", "attachments"."videoURL", "attachments"."videoKind", "attachments"."imageCaption", "attachments"."imageURL"
           FROM "attachments"
-          WHERE ("attachments"."note") IS ('Today was a good day')
+          WHERE (("attachments"."note") IS ('Today was a good day'))
           """
         } results: {
           """
@@ -222,7 +286,7 @@
           """
           SELECT "attachments"."id", "attachments"."link", "attachments"."note", "attachments"."videoURL", "attachments"."videoKind", "attachments"."imageCaption", "attachments"."imageURL"
           FROM "attachments"
-          WHERE ("attachments"."imageCaption", "attachments"."imageURL") IS NOT (NULL, NULL)
+          WHERE (("attachments"."imageCaption", "attachments"."imageURL") IS NOT (NULL, NULL))
           """
         } results: {
           """
@@ -251,7 +315,7 @@
           """
           SELECT "attachments"."id", "attachments"."link", "attachments"."note", "attachments"."videoURL", "attachments"."videoKind", "attachments"."imageCaption", "attachments"."imageURL"
           FROM "attachments"
-          WHERE ("attachments"."imageCaption", "attachments"."imageURL") IS NOT (NULL, NULL)
+          WHERE (("attachments"."imageCaption", "attachments"."imageURL") IS NOT (NULL, NULL))
           """
         } results: {
           """
@@ -328,7 +392,7 @@
           """
           UPDATE "attachments"
           SET "link" = NULL, "note" = 'Good bye world!', "videoURL" = NULL, "videoKind" = NULL, "imageCaption" = NULL, "imageURL" = NULL
-          WHERE ("attachments"."id") IN ((1))
+          WHERE (("attachments"."id") IN ((1)))
           RETURNING "id", "link", "note", "videoURL", "videoKind", "imageCaption", "imageURL"
           """
         } results: {
@@ -362,7 +426,8 @@
         assertQuery(
           Values(
             Attachment.Kind.Selection.image(
-              Attachment.Image(caption: "Blob", url: URL(string: "https://pointfree.co")!))
+              Attachment.Image(caption: "Blob", url: URL(string: "https://pointfree.co")!)
+            )
           )
         ) {
           """
@@ -381,6 +446,47 @@
           """
         }
       }
+
+      @Test func `enum case with defaults isn't always decoded successfully`() {
+        assertQuery(
+          Attachment.upsert {
+            Attachment
+              .Draft(
+                kind: .image(
+                  Attachment.Image(
+                    caption: "Hello",
+                    url: URL(string: "https://image.com")!
+                  )
+                )
+              )
+          }
+          .returning(\.self)
+        ) {
+          """
+          INSERT INTO "attachments"
+          ("id", "link", "note", "videoURL", "videoKind", "imageCaption", "imageURL")
+          VALUES
+          (NULL, NULL, NULL, NULL, NULL, 'Hello', 'https://image.com')
+          ON CONFLICT ("id")
+          DO UPDATE SET "link" = "excluded"."link", "note" = "excluded"."note", "videoURL" = "excluded"."videoURL", "videoKind" = "excluded"."videoKind", "imageCaption" = "excluded"."imageCaption", "imageURL" = "excluded"."imageURL"
+          RETURNING "id", "link", "note", "videoURL", "videoKind", "imageCaption", "imageURL"
+          """
+        } results: {
+          """
+          ┌───────────────────────────────────┐
+          │ Attachment(                       │
+          │   id: 5,                          │
+          │   kind: .image(                   │
+          │     Attachment.Image(             │
+          │       caption: "Hello",           │
+          │       url: URL(https://image.com) │
+          │     )                             │
+          │   )                               │
+          │ )                                 │
+          └───────────────────────────────────┘
+          """
+        }
+      }
     }
   }
 
@@ -388,7 +494,7 @@
     let id: Int
     let kind: Kind
 
-    @CasePathable @Selection
+    @Selection
     fileprivate enum Kind {
       case link(URL)
       case note(String)
@@ -398,9 +504,9 @@
 
     @Selection fileprivate struct Video {
       @Column("videoURL")
-      let url: URL
+      var url: URL = URL(string: "https://youtube.com")!
       @Column("videoKind")
-      var kind: Kind
+      var kind: Kind = .youtube
       fileprivate enum Kind: String, QueryBindable { case youtube, vimeo }
     }
     @Selection fileprivate struct Image {

@@ -25,7 +25,7 @@ jobs:
       - name: Select Xcode ${{ matrix.xcode }}
         run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
       - name: Run tests
-        run: swift test --traits CasePaths,Tagged
+        run: swift test --skip LivePostgresTests --traits CasePaths,Tagged
       - name: Build without exports
         run: swift build -c release -Xswiftc -D -Xswiftc EXCLUDE_EXPORTS --enable-all-traits
       - name: Build release
@@ -45,3 +45,32 @@ jobs:
         run: apt update && apt -y install libsqlite3-dev
       - name: Build
         run: swift build
+
+  postgres:
+    name: Postgres
+    runs-on: ubuntu-latest
+    container: swift:6.1
+    services:
+      postgres:
+        image: postgres:17.8-alpine
+        env:
+          POSTGRES_DB: structured_queries
+          POSTGRES_PASSWORD: structured_queries
+          POSTGRES_USER: structured_queries
+        options: >-
+          --health-cmd "pg_isready -U structured_queries -d structured_queries"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      POSTGRES_DB: structured_queries
+      POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: structured_queries
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: structured_queries
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install SQLite
+        run: apt update && apt -y install libsqlite3-dev
+      - name: Run Postgres tests
+        run: swift test --filter StructuredQueriesPostgresNIOTests

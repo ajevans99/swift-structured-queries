@@ -223,6 +223,15 @@ platforms: iOS 16, macOS 13, tvOS 16, and watchOS 9.
 Unlike upstream, this fork keeps the shared `returning` builders in `StructuredQueriesCore` so
 Postgres and SQLite clients can both use them without importing the other database integration.
 
+Both manifests depend on `IssueReporting` through `xctest-dynamic-overlay` starting at 1.11.0.
+This preserves compatibility with clients whose dependency graph still uses the original package
+identity, including Tuist project generation that cannot map the forwarding products in overlay
+1.13. Consumers requiring that compatibility should constrain overlay to 1.11.0 in their root
+manifest; the fork's lower bound alone does not prevent resolution to newer forwarding releases.
+Other dependencies must also support that legacy graph: compatibility was verified with
+`swift-custom-dump` 1.6.1, since newer releases pull in `swift-issue-reporting` through the
+`StructuredQueriesTestSupport` product. No query or PostgreSQL API changes are required.
+
 If you are interested in building a StructuredQueries integration for another database library,
 please see [Integrating with database libraries][sq-docs-integration], and
 [start a discussion](http://github.com/pointfreeco/swift-structured-queries/discussions/new/choose)

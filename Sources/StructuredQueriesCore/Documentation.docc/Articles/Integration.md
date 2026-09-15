@@ -135,6 +135,22 @@ execution when a value exceeds `Int64.max`.
 
 #### Postgres dialect support
 
+Import `StructuredQueriesPostgresNIO` and use `isNull()` and `isNotNull()` to test SQL nulls:
+
+```swift
+Reminder.where { $0.dueDate.isNull() }
+Reminder.where { $0.dueDate.isNotNull() && !$0.isCompleted }
+```
+
+These typed Boolean expressions compose with `AND`, `OR`, `NOT`, subqueries, and update/delete
+predicates. They emit PostgreSQL's `IS NULL` and `IS NOT NULL` syntax without binding `NULL` or
+parenthesizing the keyword. The existing core `is(_:)` and `isNot(_:)` operators are unchanged:
+they implement SQLite's general null-safe equality semantics, and even `is(nil)` emits syntax
+that PostgreSQL rejects. Migrate PostgreSQL null checks explicitly; do not substitute `eq(nil)`,
+which has SQL's three-valued equality semantics. For null-safe comparison of two values in
+PostgreSQL, use a schema-safe `#sql` expression with `IS NOT DISTINCT FROM` (or `IS DISTINCT FROM`
+for inequality), rather than the core SQLite `IS` operator.
+
 StructuredQueries can construct SQL that is not valid in every database. The Postgres integration
 tests the common subset used for selects, joins, predicates, ordering, inserts, updates, deletes,
 `RETURNING`, bindings, and transactions. Importing `StructuredQueriesPostgresNIO` does not make all

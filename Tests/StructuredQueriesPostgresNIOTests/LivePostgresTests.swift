@@ -4,6 +4,109 @@ import Testing
 
 @Suite(.serialized)
 struct LivePostgresTests {
+  @Test func nativeNullPredicates() async throws {
+    try await withPostgresClient { client, logger in
+      _ = try await client.execute(
+        #sql(
+          """
+          CREATE TABLE IF NOT EXISTS "sq_pg_null_predicates" (
+            "id" BIGINT PRIMARY KEY,
+            "date" TIMESTAMPTZ,
+            "uuid" UUID,
+            "text" TEXT
+          )
+          """,
+          as: Void.self
+        ),
+        logger: logger
+      )
+      _ = try await client.execute(PGNullableRecord.delete(), logger: logger)
+      _ = try await client.execute(
+        PGNullableRecord.insert {
+          PGNullableRecord(id: 1, date: nil, uuid: nil, text: nil)
+          PGNullableRecord(
+            id: 2, date: Date(timeIntervalSince1970: 123), uuid: UUID(), text: "Hello")
+          PGNullableRecord(id: 3, date: nil, uuid: UUID(), text: "Mixed")
+        },
+        logger: logger
+      )
+
+      do {
+        _ = try await collect(
+          try await client.query(
+            PGNullableRecord.where { $0.date.is(nil) }.select(\.id),
+            logger: logger
+          )
+        )
+        Issue.record("Expected PostgreSQL to reject SQLite's parenthesized NULL syntax")
+      } catch let error as PSQLError {
+        #expect(error.serverInfo?[.sqlState] == "42601")
+      }
+
+      let predicates: [QueryFragment] = [
+        PGNullableRecord.where { $0.date.isNull() }.order(by: \.id).select(\.id).query,
+        PGNullableRecord.where { $0.date.isNotNull() }.order(by: \.id).select(\.id).query,
+        PGNullableRecord.where { $0.uuid.isNull() }.order(by: \.id).select(\.id).query,
+        PGNullableRecord.where { $0.uuid.isNotNull() }.order(by: \.id).select(\.id).query,
+        PGNullableRecord.where { $0.text.isNull() }.order(by: \.id).select(\.id).query,
+        PGNullableRecord.where { $0.text.isNotNull() }.order(by: \.id).select(\.id).query,
+      ]
+      let expected = [[1, 3], [2], [1], [2, 3], [1], [2, 3]]
+      for (query, ids) in zip(predicates, expected) {
+        let rows = try await client.query(SQLQueryExpression(query, as: Int.self), logger: logger)
+        let actual = try await collect(rows)
+        #expect(actual == ids)
+      }
+
+      let composed =
+        PGNullableRecord
+        .where {
+          ($0.date.isNull() && $0.uuid.isNotNull()) || ($0.text.isNull() && $0.id.eq(1))
+        }
+        .order(by: \.id)
+        .select(\.id)
+      #expect(try await collect(try await client.query(composed, logger: logger)) == [1, 3])
+
+      let subquery = PGNullableRecord.where {
+        $0.id.in(PGNullableRecord.where { $0.text.isNotNull() }.select(\.id))
+          && $0.date.isNull()
+      }.select(\.id)
+      #expect(try await collect(try await client.query(subquery, logger: logger)) == [3])
+
+      let negated = PGNullableRecord.where { !$0.text.isNull() }.order(by: \.id).select(\.id)
+      #expect(try await collect(try await client.query(negated, logger: logger)) == [2, 3])
+
+      let scalarSubquery = PGNullableRecord.where { $0.id.eq(1) }.select(\.date).limit(1)
+      #expect(
+        try await collect(
+          try await client.query(
+            #sql("SELECT \(scalarSubquery.isNull())", as: Bool.self),
+            logger: logger
+          )
+        ) == [true]
+      )
+      let updated = try await client.execute(
+        PGNullableRecord.where { $0.uuid.isNull() }.update { $0.text = #bind("Updated") },
+        logger: logger
+      )
+      #expect(updated?.rows == 1)
+      let updatedIDs = PGNullableRecord.where { $0.text.eq("Updated") }.select(\.id)
+      #expect(try await collect(try await client.query(updatedIDs, logger: logger)) == [1])
+
+      let deleted = try await client.execute(
+        PGNullableRecord.where { $0.date.isNotNull() }.delete(),
+        logger: logger
+      )
+      #expect(deleted?.rows == 1)
+      let remaining = PGNullableRecord.order(by: \.id).select(\.id)
+      #expect(try await collect(try await client.query(remaining, logger: logger)) == [1, 3])
+      _ = try await client.execute(
+        #sql("DROP TABLE \"sq_pg_null_predicates\"", as: Void.self),
+        logger: logger
+      )
+    }
+  }
+
   @Test func crudReturningJoinsAndMetadata() async throws {
     try await withPostgresClient { client, logger in
       try await resetTables(client, logger: logger)
@@ -294,6 +397,14 @@ private struct PGUser: Equatable, Identifiable, Sendable {
   var teamID: Int
   var score: Double?
   var nickname: String?
+}
+
+@Table("sq_pg_null_predicates")
+private struct PGNullableRecord: Sendable {
+  let id: Int
+  var date: Date?
+  var uuid: UUID?
+  var text: String?
 }
 
 @Table("sq_pg_teams")

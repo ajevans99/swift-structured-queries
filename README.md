@@ -211,6 +211,8 @@ This fork also includes a Postgres integration module (not distributed by upstre
     and metadata-preserving writes on pooled clients and transaction connections. StructuredQueries
     remains primarily tuned for SQLite, so see the
     [integration guide][sq-docs-integration] for the tested Postgres subset and dialect limitations.
+    For PostgreSQL null predicates, import this module and use `.isNull()` / `.isNotNull()`,
+    not the SQLite-oriented core `.is(nil)` / `.isNot(nil)` operators.
 
 The PostgreSQL development line includes upstream main through
 [`a834ac7`](https://github.com/pointfreeco/swift-structured-queries/commit/a834ac7849d51df9d52f5699a2c94716c7a30933).

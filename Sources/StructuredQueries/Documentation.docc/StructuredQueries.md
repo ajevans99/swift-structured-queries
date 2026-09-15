@@ -20,6 +20,12 @@ StructuredQueries also ships SQLite-specific helpers:
   - [`StructuredQueriesSQLite`](structuredqueriessqlitecore): Everything from
     `StructuredQueriesSQLiteCore` and macros that support it, like `@DatabaseFunction.`
 
+StructuredQueries also ships a Postgres integration module:
+
+  - `StructuredQueriesPostgresNIO`: Extensions on `PostgresClient` and `PostgresConnection` for
+    executing and decoding StructuredQueries statements with PostgresNIO, including streaming reads,
+    transaction-scoped queries, and metadata-preserving writes.
+
 ## Topics
 
 ### Macros

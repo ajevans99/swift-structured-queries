@@ -11,16 +11,25 @@ where Values.QueryOutput: Table {
 
   public typealias QueryValue = Values
 
-  public let defaultValue: Values.QueryOutput?
+  package let name: String
 
-  public let keyPath: KeyPath<Root, Values.QueryOutput>
+  private let _defaultValue: () -> Values.QueryOutput?
 
+  private let _keyPath: () -> KeyPath<Root, Values.QueryOutput>
+
+  public var defaultValue: Values.QueryOutput? { _defaultValue() }
+
+  public var keyPath: KeyPath<Root, Values.QueryOutput> { _keyPath() }
+
+  // TODO: Reconsider access control level for 1.0.
   public init(
-    keyPath: KeyPath<Root, Values.QueryOutput>,
-    default defaultValue: Values.QueryOutput? = nil
+    _ name: String,
+    keyPath: @autoclosure @escaping () -> KeyPath<Root, Values.QueryOutput>,
+    default defaultValue: @autoclosure @escaping () -> Values.QueryOutput? = nil
   ) {
-    self.defaultValue = defaultValue
-    self.keyPath = keyPath
+    self.name = name
+    self._defaultValue = defaultValue
+    self._keyPath = keyPath
   }
 
   public var queryFragment: QueryFragment {
@@ -54,8 +63,23 @@ where Values.QueryOutput: Table {
   ) -> ColumnGroup<Root, Member> {
     let column = Values.columns[keyPath: keyPath]
     return ColumnGroup<Root, Member>(
+      column.name,
       keyPath: self.keyPath.appending(path: column.keyPath),
       default: column.defaultValue
+    )
+  }
+
+  public subscript<Member>(
+    dynamicMember keyPath: KeyPath<
+      Values.TableColumns, OptionalColumnGroup<Values.QueryOutput, Member>
+    >
+  ) -> OptionalColumnGroup<Root, Member> {
+    let column = Values.columns[keyPath: keyPath]
+    return OptionalColumnGroup(
+      base: ColumnGroup<Root, Member?>(
+        column.name,
+        keyPath: self.keyPath.appending(path: column.keyPath)
+      )
     )
   }
 

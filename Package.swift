@@ -1,4 +1,4 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.4
 
 import CompilerPluginSupport
 import PackageDescription
@@ -12,10 +12,10 @@ import PackageDescription
 let package = Package(
   name: "swift-structured-queries",
   platforms: [
-    .iOS(.v13),
-    .macOS(.v10_15),
-    .tvOS(.v13),
-    .watchOS(.v6),
+    .iOS(.v16),
+    .macOS(.v13),
+    .tvOS(.v16),
+    .watchOS(.v9),
   ],
   products: [
     .library(
@@ -35,18 +35,33 @@ let package = Package(
       targets: ["StructuredQueriesSQLiteCore"]
     ),
     .library(
+      name: "StructuredQueriesPostgresNIO",
+      targets: ["StructuredQueriesPostgresNIO"]
+    ),
+    .library(
       name: "StructuredQueriesTestSupport",
       targets: ["StructuredQueriesTestSupport"]
     ),
   ],
   traits: [
     .trait(
+      name: "CasePaths",
+      description: "Introduce enum table support to StructuredQueries."
+    ),
+    .trait(
+      name: "ColumnCoding",
+      description: "Align the Codable coding of tables and selections with their column names."
+    ),
+    .trait(
       name: "LazyInitializableByDefault",
       description: "Optionalize draft properties that have no default."
     ),
     .trait(
-      name: "CasePaths",
-      description: "Introduce enum table support to StructuredQueries."
+      name: "SuppressPlatformSQLiteAvailability",
+      description: """
+        Suppress '@available' checks on APIs that depend on a newer version of SQLite than the one \
+        bundled with the platform.
+        """
     ),
     .trait(
       name: "Tagged",
@@ -66,11 +81,13 @@ let package = Package(
   dependencies: [
     .package(url: "https://github.com/pointfreeco/swift-case-paths", from: "1.8.0"),
     .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.3.3"),
-    .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.8.1"),
-    .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.3"),
+    .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.14.0"),
+    .package(url: "https://github.com/pointfreeco/xctest-dynamic-overlay", from: "1.11.0"),
+    .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.7.0"),
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.18.4"),
     .package(url: "https://github.com/pointfreeco/swift-tagged", from: "0.10.0"),
-    .package(url: "https://github.com/pointfreeco/xctest-dynamic-overlay", from: "1.5.2"),
+    .package(url: "https://github.com/apple/swift-log", from: "1.5.3"),
+    .package(url: "https://github.com/vapor/postgres-nio", from: "1.25.0"),
     .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"605.0.0"),
   ],
   targets: [
@@ -129,6 +146,11 @@ let package = Package(
       name: "StructuredQueriesSQLiteCore",
       dependencies: [
         "StructuredQueriesCore",
+        .product(
+          name: "CasePaths",
+          package: "swift-case-paths",
+          condition: .when(traits: ["CasePaths"])
+        ),
         .product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
       ]
     ),
@@ -137,6 +159,15 @@ let package = Package(
       dependencies: [
         .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+      ]
+    ),
+    .target(
+      name: "StructuredQueriesPostgresNIO",
+      dependencies: [
+        "StructuredQueries",
+        "StructuredQueriesCore",
+        .product(name: "Logging", package: "swift-log"),
+        .product(name: "PostgresNIO", package: "postgres-nio"),
       ]
     ),
 
@@ -155,6 +186,7 @@ let package = Package(
         "StructuredQueriesSQLiteMacros",
         .product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
         .product(name: "MacroTesting", package: "swift-macro-testing"),
+        .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
       ]
     ),
     .testTarget(
@@ -169,11 +201,18 @@ let package = Package(
         .product(name: "InlineSnapshotTesting", package: "swift-snapshot-testing"),
       ]
     ),
+    .testTarget(
+      name: "StructuredQueriesPostgresNIOTests",
+      dependencies: [
+        "StructuredQueriesPostgresNIO"
+      ]
+    ),
 
     .target(
       name: "_StructuredQueriesSQLite",
       dependencies: [
-        "StructuredQueriesSQLite"
+        "StructuredQueriesSQLite",
+        .product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
       ]
     ),
   ],
@@ -186,6 +225,7 @@ if ProcessInfo.processInfo.environment["SPI_GENERATE_DOCS"] != nil  // || true  
     .default(
       enabledTraits: [
         "CasePaths",
+        "ColumnCoding",
         "Tagged",
       ]
     )

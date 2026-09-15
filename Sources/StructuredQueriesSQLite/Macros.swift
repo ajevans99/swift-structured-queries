@@ -1,6 +1,19 @@
 public import StructuredQueriesCore
 import StructuredQueriesSQLiteCore
 
+/// Defines and implements a conformance to the ``/StructuredQueriesSQLiteCore/DatabaseCollation``
+/// protocol.
+///
+/// - Parameters
+///   - name: The collating sequence's name. Defaults to the name of the function the macro is
+///     applied to.
+@attached(peer, names: overloaded, prefixed(`$`))
+public macro DatabaseCollation(_ name: String = "") =
+  #externalMacro(
+    module: "StructuredQueriesSQLiteMacros",
+    type: "DatabaseCollationMacro"
+  )
+
 /// Defines and implements a conformance to the ``/StructuredQueriesSQLiteCore/DatabaseFunction``
 /// protocol.
 ///
@@ -111,4 +124,64 @@ public macro DatabaseFunction<R: QueryBindable>(
   #externalMacro(
     module: "StructuredQueriesSQLiteMacros",
     type: "DatabaseFunctionMacro"
+  )
+
+@_documentation(visibility: private)
+@freestanding(declaration)
+public macro StructuredQueriesIsolationCheck<each Input, Output>(
+  collation: (repeat each Input) throws -> Output
+) =
+  #externalMacro(
+    module: "StructuredQueriesSQLiteMacros",
+    type: "IsolationCheckMacro"
+  )
+
+@_documentation(visibility: private)
+@freestanding(declaration)
+public macro StructuredQueriesIsolationCheck<each Input, Output>(
+  collation: @MainActor (repeat each Input) throws -> Output
+) =
+  #externalMacro(
+    module: "StructuredQueriesSQLiteMacros",
+    type: "MainActorIsolationCheckMacro"
+  )
+
+@_documentation(visibility: private)
+@freestanding(declaration)
+public macro StructuredQueriesIsolationCheck<each Input, Output>(
+  function: (repeat each Input) throws -> Output
+) =
+  #externalMacro(
+    module: "StructuredQueriesSQLiteMacros",
+    type: "IsolationCheckMacro"
+  )
+
+@_documentation(visibility: private)
+@freestanding(declaration)
+public macro StructuredQueriesIsolationCheck<each Input, Output>(
+  function: @MainActor (repeat each Input) throws -> Output
+) =
+  #externalMacro(
+    module: "StructuredQueriesSQLiteMacros",
+    type: "MainActorIsolationCheckMacro"
+  )
+
+@_documentation(visibility: private)
+@freestanding(declaration)
+public macro StructuredQueriesIsolationCheck(
+  property: () -> Void
+) =
+  #externalMacro(
+    module: "StructuredQueriesSQLiteMacros",
+    type: "IsolationCheckMacro"
+  )
+
+@_documentation(visibility: private)
+@freestanding(declaration)
+public macro StructuredQueriesIsolationCheck(
+  property: @MainActor () -> Void
+) =
+  #externalMacro(
+    module: "StructuredQueriesSQLiteMacros",
+    type: "MainActorIsolationCheckMacro"
   )

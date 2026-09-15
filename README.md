@@ -232,6 +232,12 @@ Other dependencies must also support that legacy graph: compatibility was verifi
 `swift-custom-dump` 1.6.1, since newer releases pull in `swift-issue-reporting` through the
 `StructuredQueriesTestSupport` product. No query or PostgreSQL API changes are required.
 
+Both manifests also support `swift-case-paths` from 1.8.0. The `CasePaths` trait uses
+`CasePathable`, `CasePathIterable`, and `CasePathsMacrosSupport` APIs available in that release;
+the newer macro conformance filtering remains compatible with it. Consumers can pin CasePaths
+1.8.0 alongside overlay 1.11.0 and CustomDump 1.6.1 without introducing the renamed IssueReporting
+package. Newer CasePaths versions remain supported and provide their own newer macro behavior.
+
 If you are interested in building a StructuredQueries integration for another database library,
 please see [Integrating with database libraries][sq-docs-integration], and
 [start a discussion](http://github.com/pointfreeco/swift-structured-queries/discussions/new/choose)

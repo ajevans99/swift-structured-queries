@@ -52,6 +52,19 @@ import Testing
     #expect(try Bool(decoder: &decoder))
   }
 
+  @Test func requiredNullThrowsWhileOptionalNullDecodes() throws {
+    var decoder = PostgresQueryDecoder(
+      cells: [
+        cell(.null, index: 0),
+        cell(.null, index: 1),
+      ]
+    )
+    #expect(throws: QueryDecodingError.self) {
+      try Int(decoder: &decoder)
+    }
+    #expect(try Int?(decoder: &decoder) == nil)
+  }
+
   @Test func unsignedOverflowThrows() throws {
     var decoder = PostgresQueryDecoder(
       cells: [cell(.init(int64: -1), index: 0)]

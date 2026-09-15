@@ -60,6 +60,27 @@ import Testing
     let metadata = try await client.execute(EmptyRecord.insert { [] })
     #expect(metadata == nil)
   }
+
+  @Test func returningBuildersRemainAvailableWithoutSQLite() throws {
+    let insert = EmptyRecord.insert { EmptyRecord(id: 42) }
+    let update = EmptyRecord.update { $0.id = #bind(42) }
+    let delete = EmptyRecord.delete()
+
+    let statements = [
+      insert.returning(\.self).query,
+      insert.returning { ($0.id, $0.id) }.query,
+      update.returning(\.self).query,
+      update.returning { ($0.id, $0.id) }.query,
+      delete.returning(\.self).query,
+      delete.returning { ($0.id, $0.id) }.query,
+    ]
+    for (index, statement) in statements.enumerated() {
+      let query = try PostgresQuery(queryFragment: statement)
+      let expected = index.isMultiple(of: 2) ? #"RETURNING "id""# : #"RETURNING "id", "id""#
+      #expect(query.sql.hasSuffix(expected))
+      #expect(query.binds.count == (index < 4 ? 1 : 0))
+    }
+  }
 }
 
 @Table

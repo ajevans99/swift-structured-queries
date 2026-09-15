@@ -51,10 +51,14 @@ StructuredQueries and GRDB.
 
 ### Case Study: PostgresNIO
 
-This package also contains a first-party integration module for PostgresNIO,
+This fork also contains an integration module for PostgresNIO,
 `StructuredQueriesPostgresNIO`. It extends both pooled `PostgresClient` values and
 transaction-scoped `PostgresConnection` values with overloads that execute StructuredQueries
 `Statement` and `SelectStatement` values.
+
+The module is available from `ajevans99/swift-structured-queries`, not the upstream Point-Free
+package. Pin a revision of the fork and add the `StructuredQueriesPostgresNIO` product to your
+target. It is included in both the Swift 6.4 and Swift 6.1 compatibility manifests.
 
 Start a client's lifecycle in a long-running task before issuing queries, and cancel that task when
 the client is no longer needed:
@@ -113,6 +117,10 @@ if let metadata = try await client.execute(
 An empty StructuredQueries statement is a no-op and returns `nil` metadata. Statements with
 `RETURNING` use `query` and stream their typed rows.
 
+The fork retains the shared `returning` builders in `StructuredQueriesCore` so that importing
+`StructuredQueriesPostgresNIO` alone supports inserts, updates, and deletes with `RETURNING`.
+SQLite clients use the same builders, including when both integrations are imported together.
+
 Cancelling `execute` stops the in-flight command by closing its connection. A pooled client replaces
 that connection, while cancellation inside a transaction aborts the transaction.
 
@@ -139,4 +147,4 @@ database-specific SQL against Postgres before using it in production.
 
 See the module sources [here][sq-postgres] for a complete integration:
 
-[sq-postgres]: https://github.com/pointfreeco/swift-structured-queries/tree/main/Sources/StructuredQueriesPostgresNIO
+[sq-postgres]: https://github.com/ajevans99/swift-structured-queries/tree/postgres/Sources/StructuredQueriesPostgresNIO

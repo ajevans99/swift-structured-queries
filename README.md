@@ -159,6 +159,7 @@ comfortable with the library:
   * [Primary-keyed tables](https://swiftpackageindex.com/pointfreeco/swift-structured-queries/~/documentation/structuredqueriescore/primarykeyedtables)
   * [Safe SQL strings](https://swiftpackageindex.com/pointfreeco/swift-structured-queries/~/documentation/structuredqueriescore/safesqlstrings)
   * [Query cookbook](https://swiftpackageindex.com/pointfreeco/swift-structured-queries/~/documentation/structuredqueriescore/querycookbook)
+  * [Package traits](https://swiftpackageindex.com/pointfreeco/swift-structured-queries/~/documentation/structuredqueriescore/traits)
 
 As well as more comprehensive example usage:
 
@@ -203,7 +204,7 @@ _etc._), but is currently tuned to work with SQLite. It currently has one offici
     SwiftData and the `@Query` macro. SQLiteData includes `StructuredQueriesGRDB`, a library that
     integrates this one with the popular [GRDB](https://github.com/groue/GRDB.swift) SQLite library.
 
-And one first-party Postgres integration module:
+This fork also includes a Postgres integration module (not distributed by upstream):
 
   * `StructuredQueriesPostgresNIO`: A module in this repository that integrates StructuredQueries
     with [PostgresNIO](https://github.com/vapor/postgres-nio). It supports typed streaming queries
@@ -211,12 +212,23 @@ And one first-party Postgres integration module:
     remains primarily tuned for SQLite, so see the
     [integration guide][sq-docs-integration] for the tested Postgres subset and dialect limitations.
 
+The PostgreSQL development line includes upstream main through
+[`a834ac7`](https://github.com/pointfreeco/swift-structured-queries/commit/a834ac7849d51df9d52f5699a2c94716c7a30933).
+To use `StructuredQueriesPostgresNIO`, depend on an immutable revision of
+`https://github.com/ajevans99/swift-structured-queries`, rather than an upstream release.
+The product is available in both the Swift 6.4 manifest and the Swift 6.1 compatibility manifest
+(also used by Swift 6.2 and 6.3). The synchronized package follows upstream's minimum Apple
+platforms: iOS 16, macOS 13, tvOS 16, and watchOS 9.
+
+Unlike upstream, this fork keeps the shared `returning` builders in `StructuredQueriesCore` so
+Postgres and SQLite clients can both use them without importing the other database integration.
+
 If you are interested in building a StructuredQueries integration for another database library,
 please see [Integrating with database libraries][sq-docs-integration], and
 [start a discussion](http://github.com/pointfreeco/swift-structured-queries/discussions/new/choose)
 to let us know of any challenges you encounter.
 
-[sq-docs-integration]: https://swiftpackageindex.com/pointfreeco/swift-structured-queries/main/documentation/structuredqueriescore/integration
+[sq-docs-integration]: Sources/StructuredQueriesCore/Documentation.docc/Articles/Integration.md
 
 ## Installation
 
@@ -239,11 +251,18 @@ And then adding the product to any target that needs access to the library:
 .product(name: "StructuredQueries", package: "swift-structured-queries"),
 ```
 
-If you are on Swift 6.1 or greater, you can enable package traits that extend the library with
-support for other libraries:
+If you are on Swift 6.1 or greater, you can enable
+[package traits](https://swiftpackageindex.com/pointfreeco/swift-structured-queries/~/documentation/structuredqueriescore/traits)
+that extend the library with additional functionality:
 
   * `CasePaths`: Adds support for single-table inheritance _via_ "enum" tables by
     leveraging the [CasePaths](https://github.com/pointfreeco/swift-case-paths) library.
+
+  * `ColumnCoding`: Aligns the `Codable` conformance of tables and selections with their column
+    names.
+
+  * `LazyInitializableByDefault`: Makes draft properties with no default value
+    lazy-initializable.
 
   * `Tagged`: Adds support for type-safe identifiers _via_
     the [Tagged](https://github.com/pointfreeco/swift-tagged) library.
@@ -253,25 +272,32 @@ support for other libraries:
    .package(
      url: "https://github.com/pointfreeco/swift-structured-queries",
      from: "0.28.0",
-+    traits: [
-+      "CasePaths",
-+      "Tagged",
-+    ],
++    traits: ["CasePaths", "ColumnCoding", "LazyInitializableByDefault"]
    ),
-+  .package(
-+    url: "https://github.com/pointfreeco/swift-case-paths",
-+    from: "1.0.0"
-+  ),
-+  .package(
-+    url: "https://github.com/pointfreeco/swift-tagged",
-+    from: "0.1.0"
-+  ),
  ]
 ```
 
+See [Traits] for more information on each of these traits.
+
+[Traits]: https://swiftpackageindex.com/pointfreeco/swift-structured-queries/~/documentation/structuredqueriescore/traits
+
 > [!IMPORTANT]
-> As shown above, you _must_ explicitly depend on `swift-case-paths` and/or `swift-tagged` depending
-> on the trait(s) you enable to work around a Swift bug.
+> On Swift toolchains earlier than 6.3 you _must_ also explicitly depend on `swift-case-paths`
+> and/or `swift-tagged`, depending on the trait(s) you enable, to work around a SwiftPM bug in
+> which dependencies introduced by a trait are not resolved:
+>
+> ```diff
+> +.package(
+> +  url: "https://github.com/pointfreeco/swift-case-paths",
+> +  from: "1.0.0"
+> +),
+> +.package(
+> +  url: "https://github.com/pointfreeco/swift-tagged",
+> +  from: "0.1.0"
+> +),
+> ```
+>
+> This bug is fixed in Swift 6.3, where the explicit dependencies can be omitted.
 
 ## Community
 

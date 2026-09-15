@@ -1,0 +1,269 @@
+// swift-tools-version: 6.1
+
+import CompilerPluginSupport
+import PackageDescription
+
+#if canImport(FoundationEssentials)
+  import FoundationEssentials
+#else
+  import Foundation
+#endif
+
+let package = Package(
+  name: "swift-structured-queries",
+  platforms: [
+    .iOS(.v16),
+    .macOS(.v13),
+    .tvOS(.v16),
+    .watchOS(.v9),
+  ],
+  products: [
+    .library(
+      name: "StructuredQueries",
+      targets: ["StructuredQueries"]
+    ),
+    .library(
+      name: "StructuredQueriesCore",
+      targets: ["StructuredQueriesCore"]
+    ),
+    .library(
+      name: "StructuredQueriesSQLite",
+      targets: ["StructuredQueriesSQLite"]
+    ),
+    .library(
+      name: "StructuredQueriesSQLiteCore",
+      targets: ["StructuredQueriesSQLiteCore"]
+    ),
+    .library(
+      name: "StructuredQueriesPostgresNIO",
+      targets: ["StructuredQueriesPostgresNIO"]
+    ),
+    .library(
+      name: "StructuredQueriesTestSupport",
+      targets: ["StructuredQueriesTestSupport"]
+    ),
+  ],
+  traits: [
+    .trait(
+      name: "CasePaths",
+      description: "Introduce enum table support to StructuredQueries."
+    ),
+    .trait(
+      name: "ColumnCoding",
+      description: "Align the Codable coding of tables and selections with their column names."
+    ),
+    .trait(
+      name: "LazyInitializableByDefault",
+      description: "Optionalize draft properties that have no default."
+    ),
+    .trait(
+      name: "SuppressPlatformSQLiteAvailability",
+      description: """
+        Suppress '@available' checks on APIs that depend on a newer version of SQLite than the one \
+        bundled with the platform.
+        """
+    ),
+    .trait(
+      name: "Tagged",
+      description: "Introduce StructuredQueries conformances to the swift-tagged package."
+    ),
+    .trait(
+      name: "StructuredQueriesCasePaths",
+      description: "A deprecated alias for the 'CasePaths' trait.",
+      enabledTraits: ["CasePaths"]
+    ),
+    .trait(
+      name: "StructuredQueriesTagged",
+      description: "A deprecated alias for the 'Tagged' trait.",
+      enabledTraits: ["Tagged"]
+    ),
+  ],
+  dependencies: [
+    .package(url: "https://github.com/pointfreeco/swift-case-paths", from: "1.10.0"),
+    .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.3.3"),
+    .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.14.0"),
+    .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.3"),
+    .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.18.4"),
+    .package(url: "https://github.com/pointfreeco/swift-tagged", from: "0.10.0"),
+    .package(url: "https://github.com/pointfreeco/xctest-dynamic-overlay", from: "1.13.0"),
+    .package(url: "https://github.com/apple/swift-log", from: "1.5.3"),
+    .package(url: "https://github.com/vapor/postgres-nio", from: "1.25.0"),
+    .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"605.0.0"),
+  ],
+  targets: [
+    .target(
+      name: "StructuredQueries",
+      dependencies: [
+        "StructuredQueriesCore",
+        "StructuredQueriesMacros",
+        .product(
+          name: "CasePaths",
+          package: "swift-case-paths",
+          condition: .when(traits: ["CasePaths"])
+        ),
+      ]
+    ),
+    .target(
+      name: "StructuredQueriesCore",
+      dependencies: [
+        .product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
+        .product(
+          name: "CasePaths",
+          package: "swift-case-paths",
+          condition: .when(traits: ["CasePaths"])
+        ),
+        .product(
+          name: "Tagged",
+          package: "swift-tagged",
+          condition: .when(traits: ["Tagged"])
+        ),
+      ],
+      exclude: ["Symbolic Links/README.md"]
+    ),
+    .macro(
+      name: "StructuredQueriesMacros",
+      dependencies: [
+        .product(
+          name: "CasePathsMacrosSupport",
+          package: "swift-case-paths",
+          condition: .when(traits: ["CasePaths"])
+        ),
+        .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+        .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+      ],
+      exclude: ["Symbolic Links/README.md"]
+    ),
+
+    .target(
+      name: "StructuredQueriesSQLite",
+      dependencies: [
+        "StructuredQueries",
+        "StructuredQueriesSQLiteCore",
+        "StructuredQueriesSQLiteMacros",
+      ]
+    ),
+    .target(
+      name: "StructuredQueriesSQLiteCore",
+      dependencies: [
+        "StructuredQueriesCore",
+        .product(
+          name: "CasePaths",
+          package: "swift-case-paths",
+          condition: .when(traits: ["CasePaths"])
+        ),
+        .product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
+      ]
+    ),
+    .macro(
+      name: "StructuredQueriesSQLiteMacros",
+      dependencies: [
+        .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+        .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+      ]
+    ),
+
+    .target(
+      name: "StructuredQueriesPostgresNIO",
+      dependencies: [
+        "StructuredQueries",
+        "StructuredQueriesCore",
+        .product(name: "Logging", package: "swift-log"),
+        .product(name: "PostgresNIO", package: "postgres-nio"),
+      ]
+    ),
+
+    .target(
+      name: "StructuredQueriesTestSupport",
+      dependencies: [
+        "StructuredQueriesCore",
+        .product(name: "CustomDump", package: "swift-custom-dump"),
+        .product(name: "InlineSnapshotTesting", package: "swift-snapshot-testing"),
+      ]
+    ),
+    .testTarget(
+      name: "StructuredQueriesMacrosTests",
+      dependencies: [
+        "StructuredQueriesMacros",
+        "StructuredQueriesSQLiteMacros",
+        .product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
+        .product(name: "MacroTesting", package: "swift-macro-testing"),
+        .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+      ]
+    ),
+    .testTarget(
+      name: "StructuredQueriesTests",
+      dependencies: [
+        "StructuredQueries",
+        "StructuredQueriesSQLite",
+        "StructuredQueriesTestSupport",
+        "_StructuredQueriesSQLite",
+        .product(name: "CustomDump", package: "swift-custom-dump"),
+        .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "InlineSnapshotTesting", package: "swift-snapshot-testing"),
+      ]
+    ),
+
+    .testTarget(
+      name: "StructuredQueriesPostgresNIOTests",
+      dependencies: [
+        "StructuredQueriesPostgresNIO"
+      ]
+    ),
+
+    .target(
+      name: "_StructuredQueriesSQLite",
+      dependencies: [
+        "StructuredQueriesSQLite",
+        .product(name: "IssueReporting", package: "xctest-dynamic-overlay"),
+      ]
+    ),
+  ],
+  swiftLanguageModes: [.v6]
+)
+
+if ProcessInfo.processInfo.environment["SPI_GENERATE_DOCS"] != nil  // || true  // NB: Uncomment for local testing in Xcode
+{
+  package.traits.insert(
+    .default(
+      enabledTraits: [
+        "CasePaths",
+        "ColumnCoding",
+        "Tagged",
+      ]
+    )
+  )
+}
+
+for target in package.targets {
+  target.swiftSettings = target.swiftSettings ?? []
+  target.swiftSettings?.append(contentsOf: [
+    .enableUpcomingFeature("ExistentialAny"),
+    .enableUpcomingFeature("ImmutableWeakCaptures"),
+    .enableUpcomingFeature("InferIsolatedConformances"),
+    .enableUpcomingFeature("InternalImportsByDefault"),
+    .enableUpcomingFeature("MemberImportVisibility"),
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+  ])
+}
+
+#if !canImport(Darwin)
+  package.targets.append(
+    .systemLibrary(
+      name: "_StructuredQueriesSQLite3",
+      providers: [.apt(["libsqlite3-dev"])]
+    )
+  )
+
+  for index in package.targets.indices {
+    if package.targets[index].name == "_StructuredQueriesSQLite" {
+      package.targets[index].dependencies.append("_StructuredQueriesSQLite3")
+    }
+  }
+#endif
+
+#if !os(Windows)
+  // Add the documentation compiler plugin if possible
+  package.dependencies.append(
+    .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.0")
+  )
+#endif
